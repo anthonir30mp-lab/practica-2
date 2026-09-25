@@ -31,6 +31,9 @@
                             <li class="nav-item">
                                 <a class="nav-link text-dark" asp-area="" asp-controller="Solicitudes" asp-action="Index">Mis solicitudes</a>
                             </li>
+                            <li class="nav-item">
+                                <a class="nav-link text-dark" asp-area="" asp-controller="Notificaciones" asp-action="Index">Mis notificaciones</a>
+                            </li>
 
                             var ultimaId = Context.Session.GetInt32("UltimaSolicitudId");
                             var ultimaMonto = Context.Session.GetString("UltimaSolicitudMonto");

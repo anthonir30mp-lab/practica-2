@@ -155,4 +155,4 @@ public class AnalistaController : Controller
         TempData["Exito"] = $"La solicitud #{id} fue rechazada.";
         return RedirectToAction(nameof(Index));
     }
-}
+}   
