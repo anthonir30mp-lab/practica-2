@@ -131,4 +131,95 @@ public class SolicitudesController : Controller
 
         return View(solicitud);
     }
+
+    // ──────────────────────────────────────────────────────────────
+    //  GET /Solicitudes/Create
+    // ──────────────────────────────────────────────────────────────
+    [HttpGet]
+    public IActionResult Create()
+    {
+        return View(new CrearSolicitudViewModel());
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    //  POST /Solicitudes/Create
+    // ──────────────────────────────────────────────────────────────
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Create(CrearSolicitudViewModel vm)
+    {
+        if (!ModelState.IsValid)
+        {
+            return View(vm);
+        }
+
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        // ── Obtener el cliente asociado al usuario ───────────────
+        var cliente = await _context.Clientes
+            .FirstOrDefaultAsync(c => c.UsuarioId == userId);
+
+        if (cliente is null)
+        {
+            ModelState.AddModelError(string.Empty,
+                "No se encontró un perfil de cliente asociado a su cuenta.");
+            return View(vm);
+        }
+
+        // ── Regla: el cliente debe estar activo ──────────────────
+        if (!cliente.Activo)
+        {
+            ModelState.AddModelError(string.Empty,
+                "Su cuenta de cliente no está activa. No puede crear solicitudes.");
+            return View(vm);
+        }
+
+        // ── Regla: no puede haber otra solicitud Pendiente ───────
+        var tienePendiente = await _context.SolicitudesCredito
+            .AnyAsync(s => s.ClienteId == cliente.Id
+                        && s.Estado == EstadoSolicitud.Pendiente);
+
+        if (tienePendiente)
+        {
+            ModelState.AddModelError(string.Empty,
+                "Ya tiene una solicitud en estado Pendiente. " +
+                "Debe esperar a que sea resuelta antes de crear otra.");
+            return View(vm);
+        }
+
+        // ── Regla: monto ≤ 10 × IngresosMensuales ───────────────
+        var montoLimite = 10 * cliente.IngresosMensuales;
+        if (vm.MontoSolicitado > montoLimite)
+        {
+            ModelState.AddModelError(nameof(vm.MontoSolicitado),
+                $"El monto solicitado no puede superar 10 veces sus ingresos mensuales " +
+                $"({montoLimite:C}).");
+            return View(vm);
+        }
+
+        // ── Crear la solicitud ───────────────────────────────────
+        var solicitud = new SolicitudCredito
+        {
+            ClienteId = cliente.Id,
+            MontoSolicitado = vm.MontoSolicitado,
+            FechaSolicitud = DateTime.UtcNow,
+            Estado = EstadoSolicitud.Pendiente
+        };
+
+        _context.SolicitudesCredito.Add(solicitud);
+
+        try
+        {
+            await _context.SaveChangesAsync();
+        }
+        catch (InvalidOperationException ex)
+        {
+            // Captura las reglas de negocio del DbContext como fallback.
+            ModelState.AddModelError(string.Empty, ex.Message);
+            return View(vm);
+        }
+
+        TempData["Exito"] = "Su solicitud de crédito fue registrada exitosamente.";
+        return RedirectToAction(nameof(Index));
+    }
 }

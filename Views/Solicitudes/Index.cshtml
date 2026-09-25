@@ -6,6 +6,21 @@
 
 <h2 class="mb-4">Mis solicitudes de crédito</h2>
 
+@* ── Mensaje de éxito (tras crear solicitud) ──────────────── *@
+@if (TempData["Exito"] is string mensajeExito)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <strong>✓</strong> @mensajeExito
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+    </div>
+}
+
+<div class="mb-3">
+    <a asp-action="Create" class="btn btn-primary">
+        + Nueva solicitud
+    </a>
+</div>
+
 @* ── Errores de validación de filtros ─────────────────────── *@
 @if (Model.ErroresFiltro.Count > 0)
 {
