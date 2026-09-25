@@ -1,0 +1,135 @@
+@model IEnumerable<SolicitudCredito>
+
+@{
+    ViewData["Title"] = "Panel Analista";
+}
+
+<h2 class="mb-4">Panel del Analista — Solicitudes pendientes</h2>
+
+@* ── Mensaje de éxito ─────────────────────────────────────── *@
+@if (TempData["Exito"] is string mensajeExito)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <strong>✓</strong> @mensajeExito
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+    </div>
+}
+
+@* ── Mensaje de error ─────────────────────────────────────── *@
+@if (TempData["Error"] is string mensajeError)
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <strong>✗</strong> @mensajeError
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+    </div>
+}
+
+@if (!Model.Any())
+{
+    <div class="alert alert-info">
+        No hay solicitudes pendientes por revisar.
+    </div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-striped table-hover align-middle">
+            <thead class="table-dark">
+                <tr>
+                    <th>#</th>
+                    <th>Cliente (email)</th>
+                    <th>Ingresos mensuales</th>
+                    <th>Monto solicitado</th>
+                    <th>Límite (5×)</th>
+                    <th>Fecha</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var solicitud in Model)
+                {
+                    var limiteAprobacion = 5 * solicitud.Cliente.IngresosMensuales;
+                    var excedeRegla = solicitud.MontoSolicitado > limiteAprobacion;
+
+                    <tr class="@(excedeRegla ? "table-warning" : "")">
+                        <td>@solicitud.Id</td>
+                        <td>@solicitud.Cliente.Usuario.Email</td>
+                        <td>@solicitud.Cliente.IngresosMensuales.ToString("C")</td>
+                        <td>
+                            @solicitud.MontoSolicitado.ToString("C")
+                            @if (excedeRegla)
+                            {
+                                <span class="badge bg-danger ms-1" title="Excede 5× ingresos">⚠</span>
+                            }
+                        </td>
+                        <td>@limiteAprobacion.ToString("C")</td>
+                        <td>@solicitud.FechaSolicitud.ToString("dd/MM/yyyy")</td>
+                        <td>
+                            <div class="d-flex gap-1">
+                                @* ── Botón Aprobar ────────────── *@
+                                <form asp-action="Aprobar" method="post" class="d-inline">
+                                    <input type="hidden" name="id" value="@solicitud.Id" />
+                                    <button type="submit" class="btn btn-sm btn-success"
+                                            @(excedeRegla ? "disabled" : "")
+                                            title="@(excedeRegla ? "No se puede aprobar: excede 5× ingresos" : "Aprobar solicitud")">
+                                        ✓ Aprobar
+                                    </button>
+                                </form>
+
+                                @* ── Botón Rechazar (abre modal) *@
+                                <button type="button" class="btn btn-sm btn-danger"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#modalRechazar-@solicitud.Id">
+                                    ✗ Rechazar
+                                </button>
+                            </div>
+
+                            @* ── Modal de rechazo ─────────────── *@
+                            <div class="modal fade" id="modalRechazar-@solicitud.Id" tabindex="-1"
+                                 aria-labelledby="modalRechazarLabel-@solicitud.Id" aria-hidden="true">
+                                <div class="modal-dialog">
+                                    <div class="modal-content">
+                                        <form asp-action="Rechazar" method="post">
+                                            <input type="hidden" name="id" value="@solicitud.Id" />
+                                            <div class="modal-header">
+                                                <h5 class="modal-title" id="modalRechazarLabel-@solicitud.Id">
+                                                    Rechazar solicitud #@solicitud.Id
+                                                </h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                                            </div>
+                                            <div class="modal-body">
+                                                <p>
+                                                    Cliente: <strong>@solicitud.Cliente.Usuario.Email</strong><br />
+                                                    Monto: <strong>@solicitud.MontoSolicitado.ToString("C")</strong>
+                                                </p>
+                                                <div class="mb-3">
+                                                    <label for="motivoRechazo-@solicitud.Id" class="form-label">
+                                                        Motivo de rechazo <span class="text-danger">*</span>
+                                                    </label>
+                                                    <textarea name="motivoRechazo"
+                                                              id="motivoRechazo-@solicitud.Id"
+                                                              class="form-control"
+                                                              rows="3"
+                                                              required
+                                                              placeholder="Indique el motivo del rechazo..."></textarea>
+                                                </div>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                                <button type="submit" class="btn btn-danger">Confirmar rechazo</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <p class="text-muted">
+        @Model.Count() solicitud(es) pendiente(s).
+    </p>
+}
