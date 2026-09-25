@@ -1,0 +1,147 @@
+@model SolicitudesIndexViewModel
+
+@{
+    ViewData["Title"] = "Mis solicitudes";
+}
+
+<h2 class="mb-4">Mis solicitudes de crédito</h2>
+
+@* ── Errores de validación de filtros ─────────────────────── *@
+@if (Model.ErroresFiltro.Count > 0)
+{
+    <div class="alert alert-warning alert-dismissible fade show" role="alert">
+        <strong>Aviso:</strong>
+        <ul class="mb-0 mt-1">
+            @foreach (var error in Model.ErroresFiltro)
+            {
+                <li>@error</li>
+            }
+        </ul>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+    </div>
+}
+
+@* ── Formulario de filtros ────────────────────────────────── *@
+<div class="card mb-4">
+    <div class="card-header">
+        <strong>Filtros</strong>
+    </div>
+    <div class="card-body">
+        <form method="get" asp-action="Index">
+            <div class="row g-3">
+                @* Estado *@
+                <div class="col-md-3">
+                    <label for="Estado" class="form-label">Estado</label>
+                    <select name="Estado" id="Estado" class="form-select">
+                        <option value="">Todos</option>
+                        @foreach (var estado in Enum.GetValues<EstadoSolicitud>())
+                        {
+                            <option value="@estado"
+                                    selected="@(Model.Filtro.Estado == estado)">
+                                @estado
+                            </option>
+                        }
+                    </select>
+                </div>
+
+                @* Monto mínimo *@
+                <div class="col-md-2">
+                    <label for="MontoMinimo" class="form-label">Monto mín.</label>
+                    <input type="number" step="0.01" name="MontoMinimo" id="MontoMinimo"
+                           class="form-control" value="@Model.Filtro.MontoMinimo"
+                           placeholder="0.00" />
+                </div>
+
+                @* Monto máximo *@
+                <div class="col-md-2">
+                    <label for="MontoMaximo" class="form-label">Monto máx.</label>
+                    <input type="number" step="0.01" name="MontoMaximo" id="MontoMaximo"
+                           class="form-control" value="@Model.Filtro.MontoMaximo"
+                           placeholder="0.00" />
+                </div>
+
+                @* Fecha inicio *@
+                <div class="col-md-2">
+                    <label for="FechaInicio" class="form-label">Desde</label>
+                    <input type="date" name="FechaInicio" id="FechaInicio"
+                           class="form-control"
+                           value="@(Model.Filtro.FechaInicio?.ToString("yyyy-MM-dd"))" />
+                </div>
+
+                @* Fecha fin *@
+                <div class="col-md-2">
+                    <label for="FechaFin" class="form-label">Hasta</label>
+                    <input type="date" name="FechaFin" id="FechaFin"
+                           class="form-control"
+                           value="@(Model.Filtro.FechaFin?.ToString("yyyy-MM-dd"))" />
+                </div>
+
+                @* Botones *@
+                <div class="col-md-1 d-flex align-items-end gap-1">
+                    <button type="submit" class="btn btn-primary" title="Buscar">
+                        🔍
+                    </button>
+                    <a asp-action="Index" class="btn btn-outline-secondary" title="Limpiar">
+                        ✕
+                    </a>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+@* ── Tabla de resultados ──────────────────────────────────── *@
+@if (Model.Solicitudes.Count == 0)
+{
+    <div class="alert alert-info">
+        No se encontraron solicitudes con los filtros aplicados.
+    </div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-striped table-hover align-middle">
+            <thead class="table-dark">
+                <tr>
+                    <th>#</th>
+                    <th>Monto solicitado</th>
+                    <th>Fecha</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var solicitud in Model.Solicitudes)
+                {
+                    <tr>
+                        <td>@solicitud.Id</td>
+                        <td>@solicitud.MontoSolicitado.ToString("C")</td>
+                        <td>@solicitud.FechaSolicitud.ToString("dd/MM/yyyy")</td>
+                        <td>
+                            @{
+                                var badgeClass = solicitud.Estado switch
+                                {
+                                    EstadoSolicitud.Pendiente => "bg-warning text-dark",
+                                    EstadoSolicitud.Aprobado  => "bg-success",
+                                    EstadoSolicitud.Rechazado => "bg-danger",
+                                    _ => "bg-secondary"
+                                };
+                            }
+                            <span class="badge @badgeClass">@solicitud.Estado</span>
+                        </td>
+                        <td>
+                            <a asp-action="Details" asp-route-id="@solicitud.Id"
+                               class="btn btn-sm btn-outline-primary">
+                                Ver detalle
+                            </a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <p class="text-muted">
+        Mostrando @Model.Solicitudes.Count solicitud(es).
+    </p>
+}
