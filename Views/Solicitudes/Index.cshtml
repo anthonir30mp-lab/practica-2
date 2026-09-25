@@ -4,7 +4,10 @@
     ViewData["Title"] = "Mis solicitudes";
 }
 
-<h2 class="mb-4">Mis solicitudes de crédito</h2>
+<h2 class="mb-4">
+    Mis solicitudes de crédito
+    <span id="connectionStatus" class="badge bg-secondary fs-6 align-middle">Conectando...</span>
+</h2>
 
 @* ── Mensaje de éxito (tras crear solicitud) ──────────────── *@
 @if (TempData["Exito"] is string mensajeExito)
@@ -14,6 +17,8 @@
         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
     </div>
 }
+
+<div id="notificacionRealtime"></div>
 
 <div class="mb-3">
     <a asp-action="Create" class="btn btn-primary">
@@ -128,7 +133,7 @@ else
             <tbody>
                 @foreach (var solicitud in Model.Solicitudes)
                 {
-                    <tr>
+                    <tr data-solicitud-id="@solicitud.Id">
                         <td>@solicitud.Id</td>
                         <td>@solicitud.MontoSolicitado.ToString("C")</td>
                         <td>@solicitud.FechaSolicitud.ToString("dd/MM/yyyy")</td>
@@ -142,7 +147,7 @@ else
                                     _ => "bg-secondary"
                                 };
                             }
-                            <span class="badge @badgeClass">@solicitud.Estado</span>
+                            <span id="badge-estado-@solicitud.Id" class="badge @badgeClass">@solicitud.Estado</span>
                         </td>
                         <td>
                             <a asp-action="Details" asp-route-id="@solicitud.Id"
@@ -159,4 +164,79 @@ else
     <p class="text-muted">
         Mostrando @Model.Solicitudes.Count solicitud(es).
     </p>
+}
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/@@microsoft/signalr@8.0.0/dist/browser/signalr.min.js"></script>
+    <script>
+        (function () {
+            const badgeClases = {
+                "Pendiente": "bg-warning text-dark",
+                "Aprobado": "bg-success",
+                "Rechazado": "bg-danger"
+            };
+
+            const connection = new signalR.HubConnectionBuilder()
+                .withUrl("/hubs/solicitudes")
+                .withAutomaticReconnect()
+                .build();
+
+            const statusEl = document.getElementById("connectionStatus");
+
+            function setStatus(texto, claseBadge) {
+                statusEl.textContent = texto;
+                statusEl.className = "badge fs-6 align-middle " + claseBadge;
+            }
+
+            function mostrarAviso(mensaje) {
+                const cont = document.getElementById("notificacionRealtime");
+                const div = document.createElement("div");
+                div.className = "alert alert-info alert-dismissible fade show";
+                div.innerHTML = mensaje + '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
+                cont.prepend(div);
+            }
+
+            function actualizarFila(solicitudId, estado) {
+                const badge = document.getElementById("badge-estado-" + solicitudId);
+                if (badge) {
+                    badge.textContent = estado;
+                    badge.className = "badge " + (badgeClases[estado] || "bg-secondary");
+                }
+            }
+
+            async function resincronizarFilasPendientes() {
+                const filas = document.querySelectorAll("tr[data-solicitud-id]");
+                for (const fila of filas) {
+                    const id = fila.getAttribute("data-solicitud-id");
+                    const badge = document.getElementById("badge-estado-" + id);
+                    if (badge && badge.textContent.trim() === "Pendiente") {
+                        try {
+                            const resp = await fetch("/Solicitudes/EstadoActual?id=" + id);
+                            if (resp.ok) {
+                                const data = await resp.json();
+                                actualizarFila(data.solicitudId, data.estado);
+                            }
+                        } catch (e) { /* silencioso: se reintentará en próxima reconexión */ }
+                    }
+                }
+            }
+
+            connection.on("SolicitudEstadoActualizado", function (data) {
+                actualizarFila(data.solicitudId, data.estado);
+                mostrarAviso("La solicitud #" + data.solicitudId + " cambió a estado <strong>" + data.estado + "</strong>" +
+                    (data.motivoRechazo ? " (" + data.motivoRechazo + ")" : ""));
+            });
+
+            connection.onreconnecting(() => setStatus("Reconectando...", "bg-warning text-dark"));
+            connection.onreconnected(() => {
+                setStatus("Conectado", "bg-success");
+                resincronizarFilasPendientes();
+            });
+            connection.onclose(() => setStatus("Desconectado", "bg-danger"));
+
+            connection.start()
+                .then(() => setStatus("Conectado", "bg-success"))
+                .catch(() => setStatus("Desconectado", "bg-danger"));
+        })();
+    </script>
 }
