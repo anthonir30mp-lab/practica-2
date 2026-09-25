@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using practica_2.Data;
 using practica_2.Models;
+using practica_2.Hubs;
+using practica_2.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -61,6 +63,12 @@ builder.Services.AddSession(options =>
     options.Cookie.IsEssential = true;
 });
 
+// ══════════════════════════════════════════════════════════════
+//  SignalR: Hub de notificaciones de solicitudes
+// ══════════════════════════════════════════════════════════════
+builder.Services.AddSignalR();
+builder.Services.AddScoped<INotificadorSolicitudes, NotificadorSolicitudes>();
+
 var app = builder.Build();
 
 // ══════════════════════════════════════════════════════════════
@@ -100,6 +108,8 @@ app.MapControllerRoute(
 
 app.MapRazorPages()
    .WithStaticAssets();
+
+app.MapHub<SolicitudesHub>("/hubs/solicitudes");
 
 app.Run();
 

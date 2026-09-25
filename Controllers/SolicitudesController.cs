@@ -167,6 +167,40 @@ public class SolicitudesController : Controller
     }
 
     // ──────────────────────────────────────────────────────────────
+    //  GET /Solicitudes/EstadoActual/5
+    //  Usado por el cliente JS al reconectar el WebSocket, para
+    //  recuperar el estado vigente por si hubo cambios mientras
+    //  estuvo desconectado.
+    // ──────────────────────────────────────────────────────────────
+    [HttpGet]
+    public async Task<IActionResult> EstadoActual(int id)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        var solicitud = await _context.SolicitudesCredito
+            .AsNoTracking()
+            .Include(s => s.Cliente)
+            .FirstOrDefaultAsync(s => s.Id == id);
+
+        if (solicitud is null)
+        {
+            return NotFound();
+        }
+
+        if (solicitud.Cliente.UsuarioId != userId)
+        {
+            return Forbid();
+        }
+
+        return Json(new
+        {
+            solicitudId = solicitud.Id,
+            estado = solicitud.Estado.ToString(),
+            motivoRechazo = solicitud.MotivoRechazo
+        });
+    }
+
+    // ──────────────────────────────────────────────────────────────
     //  GET /Solicitudes/Create
     // ──────────────────────────────────────────────────────────────
     [HttpGet]

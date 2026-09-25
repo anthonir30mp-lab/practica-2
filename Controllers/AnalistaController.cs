@@ -17,11 +17,13 @@ public class AnalistaController : Controller
 {
     private readonly ApplicationDbContext _context;
     private readonly SolicitudesCacheService _cacheService;
+    private readonly INotificadorSolicitudes _notificador;
 
-    public AnalistaController(ApplicationDbContext context, SolicitudesCacheService cacheService)
+    public AnalistaController(ApplicationDbContext context, SolicitudesCacheService cacheService, INotificadorSolicitudes notificador)
     {
         _context = context;
         _cacheService = cacheService;
+        _notificador = notificador;
     }
 
     // ──────────────────────────────────────────────────────────────
@@ -90,6 +92,10 @@ public class AnalistaController : Controller
         // Invalidar cache del listado del cliente afectado
         await _cacheService.InvalidarListadoAsync(solicitud.Cliente.UsuarioId);
 
+        // Notificar en tiempo real al cliente propietario
+        await _notificador.NotificarCambioEstadoAsync(
+            solicitud.Cliente.UsuarioId, solicitud.Id, solicitud.Estado.ToString(), solicitud.MotivoRechazo);
+
         TempData["Exito"] = $"La solicitud #{id} fue aprobada exitosamente.";
         return RedirectToAction(nameof(Index));
     }
@@ -141,6 +147,10 @@ public class AnalistaController : Controller
 
         // Invalidar cache del listado del cliente afectado
         await _cacheService.InvalidarListadoAsync(solicitud.Cliente.UsuarioId);
+
+        // Notificar en tiempo real al cliente propietario
+        await _notificador.NotificarCambioEstadoAsync(
+            solicitud.Cliente.UsuarioId, solicitud.Id, solicitud.Estado.ToString(), solicitud.MotivoRechazo);
 
         TempData["Exito"] = $"La solicitud #{id} fue rechazada.";
         return RedirectToAction(nameof(Index));

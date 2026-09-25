@@ -12,12 +12,17 @@
     };
 }
 
-<h2 class="mb-4">Detalle de solicitud</h2>
+<h2 class="mb-4">
+    Detalle de solicitud
+    <span id="connectionStatus" class="badge bg-secondary fs-6 align-middle">Conectando...</span>
+</h2>
+
+<div id="notificacionRealtime"></div>
 
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
         <strong>Solicitud #@Model.Id</strong>
-        <span class="badge @badgeClass fs-6">@Model.Estado</span>
+        <span id="badge-estado-@Model.Id" class="badge @badgeClass fs-6">@Model.Estado</span>
     </div>
     <div class="card-body">
         <dl class="row mb-0">
@@ -32,18 +37,15 @@
 
             <dt class="col-sm-4">Estado</dt>
             <dd class="col-sm-8">
-                <span class="badge @badgeClass">@Model.Estado</span>
+                <span id="badge-estado-dl-@Model.Id" class="badge @badgeClass">@Model.Estado</span>
             </dd>
 
-            @if (Model.Estado == EstadoSolicitud.Rechazado && !string.IsNullOrWhiteSpace(Model.MotivoRechazo))
-            {
-                <dt class="col-sm-4">Motivo de rechazo</dt>
-                <dd class="col-sm-8">
-                    <div class="alert alert-danger mb-0 py-2">
-                        @Model.MotivoRechazo
-                    </div>
-                </dd>
-            }
+            <dt class="col-sm-4" id="motivo-label-@Model.Id" style="@(Model.Estado == EstadoSolicitud.Rechazado ? "" : "display:none;")">Motivo de rechazo</dt>
+            <dd class="col-sm-8" id="motivo-valor-@Model.Id" style="@(Model.Estado == EstadoSolicitud.Rechazado ? "" : "display:none;")">
+                <div class="alert alert-danger mb-0 py-2">
+                    @Model.MotivoRechazo
+                </div>
+            </dd>
         </dl>
     </div>
 </div>
@@ -53,3 +55,81 @@
         ← Volver al listado
     </a>
 </div>
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/@@microsoft/signalr@8.0.0/dist/browser/signalr.min.js"></script>
+    <script>
+        (function () {
+            const solicitudId = @Model.Id;
+            const badgeClases = {
+                "Pendiente": "bg-warning text-dark",
+                "Aprobado": "bg-success",
+                "Rechazado": "bg-danger"
+            };
+
+            const connection = new signalR.HubConnectionBuilder()
+                .withUrl("/hubs/solicitudes")
+                .withAutomaticReconnect()
+                .build();
+
+            const statusEl = document.getElementById("connectionStatus");
+
+            function setStatus(texto, claseBadge) {
+                statusEl.textContent = texto;
+                statusEl.className = "badge fs-6 align-middle " + claseBadge;
+            }
+
+            function mostrarAviso(mensaje) {
+                const cont = document.getElementById("notificacionRealtime");
+                const div = document.createElement("div");
+                div.className = "alert alert-info alert-dismissible fade show";
+                div.innerHTML = mensaje + '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
+                cont.prepend(div);
+            }
+
+            function aplicarEstado(estado, motivoRechazo) {
+                const claseBadge = badgeClases[estado] || "bg-secondary";
+
+                const badgeHeader = document.getElementById("badge-estado-" + solicitudId);
+                if (badgeHeader) { badgeHeader.textContent = estado; badgeHeader.className = "badge fs-6 " + claseBadge; }
+
+                const badgeDl = document.getElementById("badge-estado-dl-" + solicitudId);
+                if (badgeDl) { badgeDl.textContent = estado; badgeDl.className = "badge " + claseBadge; }
+
+                const motivoLabel = document.getElementById("motivo-label-" + solicitudId);
+                const motivoValor = document.getElementById("motivo-valor-" + solicitudId);
+                if (estado === "Rechazado" && motivoRechazo) {
+                    motivoLabel.style.display = "";
+                    motivoValor.style.display = "";
+                    motivoValor.querySelector(".alert").textContent = motivoRechazo;
+                }
+            }
+
+            async function resincronizar() {
+                try {
+                    const resp = await fetch("/Solicitudes/EstadoActual?id=" + solicitudId);
+                    if (resp.ok) {
+                        const data = await resp.json();
+                        aplicarEstado(data.estado, data.motivoRechazo);
+                    }
+                } catch (e) { /* silencioso */ }
+            }
+
+            connection.on("SolicitudEstadoActualizado", function (data) {
+                if (data.solicitudId === solicitudId) {
+                    aplicarEstado(data.estado, data.motivoRechazo);
+                    mostrarAviso("El estado de esta solicitud cambió a <strong>" + data.estado + "</strong>" +
+                        (data.motivoRechazo ? " (" + data.motivoRechazo + ")" : ""));
+                }
+            });
+
+            connection.onreconnecting(() => setStatus("Reconectando...", "bg-warning text-dark"));
+            connection.onreconnected(() => { setStatus("Conectado", "bg-success"); resincronizar(); });
+            connection.onclose(() => setStatus("Desconectado", "bg-danger"));
+
+            connection.start()
+                .then(() => setStatus("Conectado", "bg-success"))
+                .catch(() => setStatus("Desconectado", "bg-danger"));
+        })();
+    </script>
+}
