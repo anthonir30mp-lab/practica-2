@@ -1,0 +1,52 @@
+@model CrearSolicitudViewModel
+
+@{
+    ViewData["Title"] = "Nueva solicitud";
+}
+
+<h2 class="mb-4">Nueva solicitud de crédito</h2>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <strong>Datos de la solicitud</strong>
+            </div>
+            <div class="card-body">
+
+                @* ── Errores generales (reglas de negocio) ──────── *@
+                <div asp-validation-summary="All" class="text-danger mb-3"></div>
+
+                <form asp-action="Create" method="post">
+                    <div class="mb-3">
+                        <label asp-for="MontoSolicitado" class="form-label"></label>
+                        <div class="input-group">
+                            <span class="input-group-text">$</span>
+                            <input asp-for="MontoSolicitado"
+                                   class="form-control"
+                                   type="number"
+                                   step="0.01"
+                                   min="0.01"
+                                   placeholder="0.00" />
+                        </div>
+                        <span asp-validation-for="MontoSolicitado" class="text-danger"></span>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            Enviar solicitud
+                        </button>
+                        <a asp-action="Index" class="btn btn-outline-secondary">
+                            Cancelar
+                        </a>
+                    </div>
+                </form>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}
