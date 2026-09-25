@@ -8,6 +8,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 {
     public DbSet<Cliente> Clientes => Set<Cliente>();
     public DbSet<SolicitudCredito> SolicitudesCredito => Set<SolicitudCredito>();
+    public DbSet<Notificacion> Notificaciones => Set<Notificacion>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -62,6 +63,22 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             // una solicitud en estado Pendiente a la vez.
             // SQLite no soporta HasFilter, por lo que esta restricción
             // se aplica en SaveChanges / SaveChangesAsync.
+        });
+
+        // ── Notificacion ─────────────────────────────────────────
+        builder.Entity<Notificacion>(entity =>
+        {
+            entity.HasKey(n => n.Id);
+
+            entity.Property(n => n.Texto)
+                  .IsRequired()
+                  .HasMaxLength(500);
+
+            entity.Property(n => n.UsuarioId)
+                  .IsRequired();
+
+            // Unicidad de MessageId: evita duplicados ante una redelivery.
+            entity.HasIndex(n => n.MessageId).IsUnique();
         });
     }
 

@@ -17,11 +17,13 @@ public class SolicitudesController : Controller
 {
     private readonly ApplicationDbContext _context;
     private readonly SolicitudesCacheService _cacheService;
+    private readonly IRabbitMqPublisher _publisher;
 
-    public SolicitudesController(ApplicationDbContext context, SolicitudesCacheService cacheService)
+    public SolicitudesController(ApplicationDbContext context, SolicitudesCacheService cacheService, IRabbitMqPublisher publisher)
     {
         _context = context;
         _cacheService = cacheService;
+        _publisher = publisher;
     }
 
     // ──────────────────────────────────────────────────────────────
@@ -289,6 +291,13 @@ public class SolicitudesController : Controller
 
         // ── Invalidar cache del listado ──────────────────────────
         await _cacheService.InvalidarListadoAsync(userId ?? string.Empty);
+
+        // ── Publicar evento SolicitudRegistrada (no bloquea el flujo si falla) ──
+        var publicado = await _publisher.PublicarSolicitudRegistradaAsync(solicitud.Id, userId ?? string.Empty);
+        if (!publicado)
+        {
+            TempData["Advertencia"] = "La solicitud fue registrada, pero no se pudo encolar la notificación. Se reintentará el envío manualmente con el mismo MessageId.";
+        }
 
         TempData["Exito"] = "Su solicitud de crédito fue registrada exitosamente.";
         return RedirectToAction(nameof(Index));

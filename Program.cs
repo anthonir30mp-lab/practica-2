@@ -68,7 +68,10 @@ builder.Services.AddSession(options =>
 // ══════════════════════════════════════════════════════════════
 builder.Services.AddSignalR();
 builder.Services.AddScoped<INotificadorSolicitudes, NotificadorSolicitudes>();
-
+// ══════════════════════════════════════════════════════════════
+//  RabbitMQ: publicador de eventos (Cloud MQ)
+// ══════════════════════════════════════════════════════════════
+builder.Services.AddSingleton<IRabbitMqPublisher, RabbitMqPublisher>();
 var app = builder.Build();
 
 // ══════════════════════════════════════════════════════════════
