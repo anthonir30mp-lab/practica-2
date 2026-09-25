@@ -31,6 +31,20 @@
                             <li class="nav-item">
                                 <a class="nav-link text-dark" asp-area="" asp-controller="Solicitudes" asp-action="Index">Mis solicitudes</a>
                             </li>
+
+                            var ultimaId = Context.Session.GetInt32("UltimaSolicitudId");
+                            var ultimaMonto = Context.Session.GetString("UltimaSolicitudMonto");
+
+                            if (ultimaId.HasValue && !string.IsNullOrEmpty(ultimaMonto))
+                            {
+                                <li class="nav-item">
+                                    <a class="nav-link text-primary"
+                                       asp-area="" asp-controller="Solicitudes"
+                                       asp-action="Details" asp-route-id="@ultimaId.Value">
+                                        Ver última solicitud (@ultimaMonto)
+                                    </a>
+                                </li>
+                            }
                         }
                     </ul>
                     <partial name="_LoginPartial" />

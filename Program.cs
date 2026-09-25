@@ -16,6 +16,46 @@ builder.Services.AddDefaultIdentity<IdentityUser>(options => options.SignIn.Requ
     .AddEntityFrameworkStores<ApplicationDbContext>();
 builder.Services.AddControllersWithViews();
 
+// ══════════════════════════════════════════════════════════════
+//  Distributed Cache: Redis con fallback a memoria
+// ══════════════════════════════════════════════════════════════
+var redisConnectionString = builder.Configuration["Redis:ConnectionString"];
+
+if (!string.IsNullOrWhiteSpace(redisConnectionString))
+{
+    try
+    {
+        builder.Services.AddStackExchangeRedisCache(options =>
+        {
+            options.Configuration = redisConnectionString;
+            options.InstanceName = "practica2_";
+        });
+    }
+    catch
+    {
+        // Si la configuración falla, usar caché en memoria.
+        builder.Services.AddDistributedMemoryCache();
+    }
+}
+else
+{
+    // Sin Redis configurado → caché en memoria como fallback.
+    builder.Services.AddDistributedMemoryCache();
+}
+
+// ── Servicio de cache de solicitudes ─────────────────────────
+builder.Services.AddScoped<practica_2.Services.SolicitudesCacheService>();
+
+// ══════════════════════════════════════════════════════════════
+//  Sesión (Redis-backed o in-memory)
+// ══════════════════════════════════════════════════════════════
+builder.Services.AddSession(options =>
+{
+    options.IdleTimeout = TimeSpan.FromMinutes(30);
+    options.Cookie.HttpOnly = true;
+    options.Cookie.IsEssential = true;
+});
+
 var app = builder.Build();
 
 // ══════════════════════════════════════════════════════════════
@@ -43,6 +83,8 @@ app.UseHttpsRedirection();
 app.UseRouting();
 
 app.UseAuthorization();
+
+app.UseSession();
 
 app.MapStaticAssets();
 

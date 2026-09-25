@@ -1,9 +1,11 @@
 using System.Security.Claims;
+using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using practica_2.Data;
 using practica_2.Models;
+using practica_2.Services;
 
 namespace practica_2.Controllers;
 
@@ -14,10 +16,12 @@ namespace practica_2.Controllers;
 public class SolicitudesController : Controller
 {
     private readonly ApplicationDbContext _context;
+    private readonly SolicitudesCacheService _cacheService;
 
-    public SolicitudesController(ApplicationDbContext context)
+    public SolicitudesController(ApplicationDbContext context, SolicitudesCacheService cacheService)
     {
         _context = context;
+        _cacheService = cacheService;
     }
 
     // ──────────────────────────────────────────────────────────────
@@ -26,7 +30,7 @@ public class SolicitudesController : Controller
     [HttpGet]
     public async Task<IActionResult> Index([FromQuery] SolicitudFiltroViewModel filtro)
     {
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)!;
 
         var cliente = await _context.Clientes
             .AsNoTracking()
@@ -38,6 +42,24 @@ public class SolicitudesController : Controller
         {
             // El usuario no tiene perfil de cliente; devolver lista vacía.
             return View(vm);
+        }
+
+        // Determinar si hay filtros activos.
+        bool hayFiltros = filtro.Estado.HasValue
+                       || filtro.MontoMinimo.HasValue
+                       || filtro.MontoMaximo.HasValue
+                       || filtro.FechaInicio.HasValue
+                       || filtro.FechaFin.HasValue;
+
+        // ── Intentar cache (solo sin filtros) ────────────────────
+        if (!hayFiltros)
+        {
+            var cacheado = await _cacheService.ObtenerListadoAsync<SolicitudCredito>(userId);
+            if (cacheado is not null)
+            {
+                vm.Solicitudes = cacheado;
+                return View(vm);
+            }
         }
 
         // Consulta base: solo solicitudes del cliente autenticado.
@@ -93,9 +115,17 @@ public class SolicitudesController : Controller
             }
         }
 
-        vm.Solicitudes = await query
+        var resultados = await query
             .OrderByDescending(s => s.FechaSolicitud)
             .ToListAsync();
+
+        vm.Solicitudes = resultados;
+
+        // ── Guardar en cache (solo sin filtros) ──────────────────
+        if (!hayFiltros)
+        {
+            await _cacheService.GuardarListadoAsync(userId, resultados);
+        }
 
         return View(vm);
     }
@@ -128,6 +158,10 @@ public class SolicitudesController : Controller
         {
             return Forbid();
         }
+
+        // ── Guardar en sesión la última solicitud visitada ───────
+        HttpContext.Session.SetInt32("UltimaSolicitudId", solicitud.Id);
+        HttpContext.Session.SetString("UltimaSolicitudMonto", solicitud.MontoSolicitado.ToString("C"));
 
         return View(solicitud);
     }
@@ -218,6 +252,9 @@ public class SolicitudesController : Controller
             ModelState.AddModelError(string.Empty, ex.Message);
             return View(vm);
         }
+
+        // ── Invalidar cache del listado ──────────────────────────
+        await _cacheService.InvalidarListadoAsync(userId ?? string.Empty);
 
         TempData["Exito"] = "Su solicitud de crédito fue registrada exitosamente.";
         return RedirectToAction(nameof(Index));
