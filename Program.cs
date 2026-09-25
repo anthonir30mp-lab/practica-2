@@ -71,7 +71,8 @@ builder.Services.AddScoped<INotificadorSolicitudes, NotificadorSolicitudes>();
 // ══════════════════════════════════════════════════════════════
 //  RabbitMQ: publicador de eventos (Cloud MQ)
 // ══════════════════════════════════════════════════════════════
-builder.Services.AddSingleton<IRabbitMqPublisher, RabbitMqPublisher>();
+builder.Services.AddSingleton<IRabbitMqPublisher, RabbitMqPublisher>(); 
+builder.Services.AddHostedService<RabbitMqConsumerService>();
 var app = builder.Build();
 
 // ══════════════════════════════════════════════════════════════
